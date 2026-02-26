@@ -1,0 +1,168 @@
+'use client';
+
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { VideoPlayer } from '@/components/video-player';
+import { PlaylistSidebar } from '@/components/playlist-sidebar';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, GraduationCap } from 'lucide-react';
+import { Navbar } from '@/components/navbar';
+
+function WatchPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const videoId = searchParams.get('v');
+  const [playlistData, setPlaylistData] = useState(null);
+
+  const [videoData, setVideoData] = useState({
+    title: 'Loading video...',
+    description: '',
+    channelTitle: '',
+    difficulty: 'beginner',
+  });
+
+  type Video = {
+    id: string;
+    title: string;
+    description: string;
+    channelTitle: string;
+    duration: string;
+    thumbnailUrl: string;
+    difficulty: string;
+    order: number;
+    isCompleted?: boolean;
+    [key: string]: any;
+  };
+  type Playlist = {
+    title: string;
+    description: string;
+    totalVideos: number;
+    completedVideos: number;
+    videos: Video[];
+    [key: string]: any;
+  };
+  const [playlist, setPlaylist] = useState<Playlist | null>(null);
+
+  useEffect(() => {
+    // Load playlist from localStorage
+    let loadedPlaylist = null;
+    try {
+      const stored = localStorage.getItem('neuro_playlist');
+      if (stored) {
+        loadedPlaylist = JSON.parse(stored);
+        console.log('[DEBUG] Loaded playlist from localStorage:', loadedPlaylist);
+        setPlaylist(loadedPlaylist);
+      } else {
+        console.warn('[DEBUG] No playlist found in localStorage');
+      }
+    } catch (error) {
+      console.error('[DEBUG] Failed to load playlist from localStorage:', error);
+    }
+
+    // Set videoData from playlist if available
+    if (videoId && loadedPlaylist && loadedPlaylist.videos) {
+      const video = loadedPlaylist.videos.find((v: Video) => v.id === videoId);
+      console.log('[DEBUG] Looking for videoId', videoId, 'in playlist.videos:', loadedPlaylist.videos);
+      if (video) {
+        console.log('[DEBUG] Found video for videoId', videoId, ':', video);
+        setVideoData({
+          title: video.title,
+          description: video.description,
+          channelTitle: video.channelTitle || '',
+          difficulty: video.difficulty || 'beginner',
+        });
+        return;
+      } else {
+        console.warn('[DEBUG] No video found for videoId', videoId, 'in playlist');
+      }
+    }
+    // fallback placeholder
+    setVideoData({
+      title: 'Educational Video',
+      description: 'This is a placeholder description for the educational video.',
+      channelTitle: 'Educational Channel',
+      difficulty: 'beginner',
+    });
+  }, [videoId]);
+
+  if (!videoId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Video Not Found</h1>
+          <Button onClick={() => router.push('/')}>Go Back Home</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <Navbar showBackButton={true} showAuthButtons={false} />
+
+      {/* Main Content */}
+      <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-80px)] w-full">
+        {/* Video Player Section */}
+        <div className={`${playlist ? 'flex-1 min-w-0' : 'w-full'} flex flex-col`}>
+          <div className="flex-1 px-3 sm:px-6 lg:px-14 py-4 overflow-y-auto scrollbar-hide" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
+            <style jsx>{`
+              .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+              }
+            `}</style>
+            <div className="w-full">
+              {(videoData.title && videoData.description && videoData.title !== 'Educational Video' && videoData.description !== 'This is a placeholder description for the educational video.') ? (
+                <VideoPlayer
+                  videoId={videoId}
+                  title={videoData.title}
+                  description={videoData.description}
+                  channelTitle={videoData.channelTitle}
+                  difficulty={videoData.difficulty}
+                  onComplete={() => {
+                    // Handle video completion
+                    console.log('Video completed');
+                  }}
+                  onNext={() => {
+                    // Navigate to next video in playlist
+                    if (playlist && playlist.videos) {
+                      const currentIndex = playlist.videos.findIndex((v: Video) => v.id === videoId);
+                      const nextVideo = playlist.videos[currentIndex + 1];
+                      if (nextVideo) {
+                        router.push(`/watch?v=${nextVideo.id}`);
+                      }
+                    }
+                  }}
+                />
+              ) : (
+                <div className="text-center py-16 text-muted-foreground">Loading video details...</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Playlist Sidebar - Fixed width, no gaps */}
+        {playlist && (
+          <div className="w-full lg:w-[402px] flex-shrink-0 lg:h-full border-t lg:border-t-0 lg:border-l bg-background">
+            <PlaylistSidebar
+              playlist={playlist}
+              currentVideoId={videoId}
+              onVideoSelect={(selectedVideoId: string) => {
+                router.push(`/watch?v=${selectedVideoId}`);
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function WatchPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <WatchPageContent />
+    </Suspense>
+  );
+}
