@@ -34,6 +34,10 @@ export function Navbar({ showBackButton = false, showAuthButtons = true, isAuthe
               <span className="hidden sm:inline">Dashboard</span>
               <span className="sm:hidden">Dash</span>
             </Button>
+            <Button variant="default" size="sm" className="text-xs sm:text-sm px-2 sm:px-4" onClick={() => router.push('/roadmap')}>
+              <span className="hidden sm:inline">Roadmaps</span>
+              <span className="sm:hidden">Road</span>
+            </Button>
             <Button variant="ghost" size="sm" className="text-xs sm:text-sm px-2 sm:px-4" onClick={() => signOut({ callbackUrl: '/' })}>
               Logout
             </Button>

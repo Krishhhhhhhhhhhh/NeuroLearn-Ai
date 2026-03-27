@@ -28,7 +28,13 @@ export class YouTubeService {
   private baseUrl = 'https://www.googleapis.com/youtube/v3';
 
   constructor() {
-    this.apiKeys = process.env.YOUTUBE_API_KEYS!.split(",");
+    if (!process.env.YOUTUBE_API_KEYS) {
+      throw new Error('YOUTUBE_API_KEYS environment variable is not set. Make sure .env.local exists in the project root.');
+    }
+    this.apiKeys = process.env.YOUTUBE_API_KEYS.split(",").filter(key => key.trim());
+    if (this.apiKeys.length === 0) {
+      throw new Error('No valid YouTube API keys found in YOUTUBE_API_KEYS');
+    }
   }
 
   private getRandomApiKey(): string {

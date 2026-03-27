@@ -79,6 +79,8 @@ model User {
   histories     History[]
   badges        Badge[]
   playlists     Playlist[]
+  roadmaps      UserRoadmapProgress[]
+  nodeProgress  UserNodeProgress[]
   createdAt     DateTime  @default(now())
 }
 
@@ -133,4 +135,83 @@ model History {
   watchTime Int?     // seconds watched
   completed Boolean  @default(false)
   viewedAt  DateTime @default(now())
+}
+
+// Roadmap Feature Models
+model Roadmap {
+  id               String                  @id @default(cuid())
+  title            String
+  description      String?
+  slug             String                  @unique
+  thumbnail        String?
+  difficulty       String                  @default("intermediate")
+  
+  nodes            RoadmapNode[]
+  userProgress     UserRoadmapProgress[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  
+  @@index([slug])
+  @@map("roadmap")
+}
+
+model RoadmapNode {
+  id               String                  @id @default(cuid())
+  roadmapId        String
+  roadmap          Roadmap                 @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  
+  title            String
+  description      String?
+  resources        Json?
+  
+  position         Json
+  dependsOn        String[]                @default([])
+  
+  userProgress     UserNodeProgress[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  
+  @@unique([roadmapId, title])
+  @@index([roadmapId])
+  @@map("roadmapNode")
+}
+
+model UserRoadmapProgress {
+  id               String                  @id @default(cuid())
+  userId           String
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  roadmapId        String
+  roadmap          Roadmap                 @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  
+  nodeProgress     UserNodeProgress[]
+  progressPercent  Int                     @default(0)
+  startedAt        DateTime                @default(now())
+  completedAt      DateTime?
+  lastAccessedAt   DateTime                @updatedAt
+  
+  @@unique([userId, roadmapId])
+  @@index([userId, roadmapId])
+  @@map("userRoadmapProgress")
+}
+
+model UserNodeProgress {
+  id               String                  @id @default(cuid())
+  userId           String
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  nodeId           String
+  node             RoadmapNode             @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  
+  roadmapProgressId String
+  roadmapProgress  UserRoadmapProgress     @relation(fields: [roadmapProgressId], references: [id], onDelete: Cascade)
+  
+  state            String                  @default("locked")
+  unlockedAt       DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  
+  @@unique([userId, nodeId])
+  @@index([userId, roadmapProgressId])
+  @@map("userNodeProgress")
 }

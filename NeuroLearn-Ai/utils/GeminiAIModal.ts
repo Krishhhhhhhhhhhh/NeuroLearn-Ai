@@ -8,41 +8,55 @@ import {
   SafetySetting
 } from "@google/generative-ai";
 
-const apiKey: string = process.env.NEXT_PUBLIC_GEMINI_API_KEY as string;
-const genAI: GoogleGenerativeAI = new GoogleGenerativeAI(apiKey);
+let chatSession: ChatSession | null = null;
 
-const model: GenerativeModel = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash",
-});
+function getChatSession(): ChatSession {
+  if (chatSession) return chatSession;
 
-const generationConfig: GenerationConfig = {
-  temperature: 1,
-  topP: 0.95,
-  topK: 64,
-  maxOutputTokens: 8192,
-  responseMimeType: "text/plain",
-};
+  const apiKey: string = process.env.GEMINI_API_KEY as string;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set. Make sure .env.local exists in the project root.');
+  }
 
-const safetySettings: SafetySetting[] = [
-  {
-    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-  },
-];
+  const genAI: GoogleGenerativeAI = new GoogleGenerativeAI(apiKey);
 
-export const chatSession: ChatSession = model.startChat({
-  generationConfig,
-  safetySettings,
-});
+  const model: GenerativeModel = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+  });
+
+  const generationConfig: GenerationConfig = {
+    temperature: 1,
+    topP: 0.95,
+    topK: 64,
+    maxOutputTokens: 8192,
+    responseMimeType: "text/plain",
+  };
+
+  const safetySettings: SafetySetting[] = [
+    {
+      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+  ];
+
+  chatSession = model.startChat({
+    generationConfig,
+    safetySettings,
+  });
+
+  return chatSession;
+}
+
+export { getChatSession };

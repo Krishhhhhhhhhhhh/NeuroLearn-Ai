@@ -49,17 +49,27 @@ export async function POST(request: NextRequest) {
     // Categorize videos by difficulty using AI
     const categorizedVideos = await Promise.all(
       uniqueVideos.map(async (video, index) => {
-        const aiDifficulty = await geminiService.categorizeDifficulty(
-          video.title, 
-          video.description
-        );
-        
-        return {
-          ...video,
-          order: index + 1,
-          difficulty: aiDifficulty,
-          duration: youtubeService.formatDuration(video.duration),
-        };
+        try {
+          const aiDifficulty = await geminiService.categorizeDifficulty(
+            video.title, 
+            video.description
+          );
+          
+          return {
+            ...video,
+            order: index + 1,
+            difficulty: aiDifficulty,
+            duration: youtubeService.formatDuration(video.duration),
+          };
+        } catch (error) {
+          console.warn(`Error categorizing video ${video.id}, using fallback:`, error);
+          return {
+            ...video,
+            order: index + 1,
+            difficulty: 'beginner', // fallback
+            duration: youtubeService.formatDuration(video.duration),
+          };
+        }
       })
     );
 
@@ -120,10 +130,26 @@ export async function POST(request: NextRequest) {
       message: `Found ${sortedVideos.length} videos for "${query}"`
     });
 
-  } catch (error) {
-    console.error('Search API Error:', error);
+  } catch (error: any) {
+    console.error('Search API Error:', {
+      message: error?.message,
+      code: error?.code,
+      status: error?.status,
+      stack: error?.stack
+    });
+    
+    // Return the actual error for debugging
+    const errorMessage = error?.message || 'Unknown error occurred';
+    
     return NextResponse.json(
-      { error: 'Failed to search videos. Please try again.' },
+      { 
+        error: errorMessage,
+        details: {
+          code: error?.code,
+          status: error?.status,
+          type: error?.constructor?.name
+        }
+      },
       { status: 500 }
     );
   }
