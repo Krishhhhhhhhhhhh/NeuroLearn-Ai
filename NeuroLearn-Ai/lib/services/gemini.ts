@@ -4,7 +4,10 @@ export class GeminiService {
   private genAI: GoogleGenerativeAI;
 
   constructor() {
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY environment variable is not set. Make sure .env.local exists in the project root.');
+    }
+    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   }
 
   async generateVideoSummary(title: string, description: string): Promise<string> {
@@ -168,10 +171,34 @@ export class GeminiService {
         return difficulty;
       }
       return 'beginner'; // default fallback
-    } catch (error) {
-      console.error('Gemini Difficulty Categorization Error:', error);
-      return 'beginner';
+    } catch (error: any) {
+      console.warn('[Gemini] Error categorizing difficulty (using fallback):', error?.message);
+      // Use keyword-based fallback when Gemini API is unavailable or rate-limited
+      return this.categorizeDifficultyFallback(title, description);
     }
+  }
+
+  private categorizeDifficultyFallback(title: string, description: string): string {
+    const text = `${title} ${description}`.toLowerCase();
+    
+    // Advanced keywords
+    const advancedKeywords = ['advanced', 'expert', 'professional', 'complex', 'optimization', 'architecture', 'system design', 'deep dive', 'specialized', 'enterprise', 'performance tuning', 'advanced concepts'];
+    
+    // Intermediate keywords  
+    const intermediateKeywords = ['intermediate', 'building', 'development', 'implementation', 'project', 'application', 'best practices', 'design patterns', 'practical', 'hands-on', 'build'];
+    
+    // Check for advanced keywords
+    if (advancedKeywords.some(keyword => text.includes(keyword))) {
+      return 'advanced';
+    }
+    
+    // Check for intermediate keywords
+    if (intermediateKeywords.some(keyword => text.includes(keyword))) {
+      return 'intermediate';
+    }
+    
+    // Default to beginner
+    return 'beginner';
   }
 }
 

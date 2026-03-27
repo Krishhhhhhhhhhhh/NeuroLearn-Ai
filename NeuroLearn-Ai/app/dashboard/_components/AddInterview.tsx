@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { chatSession } from '@/utils/GeminiAIModal';
+import { getChatSession } from '@/utils/GeminiAIModal';
 import { LoaderCircle, Plus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
@@ -54,7 +54,7 @@ export function AddInterview({ onSuccess, variant = 'button' }: AddInterviewProp
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           console.log(`Attempt ${attempt + 1} to call Gemini API...`);
-          result = await chatSession.sendMessage(InputPrompt);
+          result = await getChatSession().sendMessage(InputPrompt);
           console.log("Gemini API response received successfully");
           break;
         } catch (error: any) {
