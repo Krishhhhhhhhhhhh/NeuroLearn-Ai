@@ -1,22 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Navbar } from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, BookOpen, Zap, Loader2, Share2, Copy, Download } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { AlertCircle, Zap, Loader2, Share2, Copy, Download } from 'lucide-react';
+import { RoadmapViewer } from '@/components/roadmap/RoadmapViewer';
 import { RoadmapNodeDetail } from '@/components/roadmap/RoadmapNodeDetail';
 import { generateRoadmapWithGemini } from '@/lib/services/roadmapGenerator';
-
-// Dynamic import to avoid SSR issues with React Flow
-const RoadmapCanvas = dynamic(() => import('@/components/roadmap/RoadmapCanvas'), {
-  ssr: false,
-  loading: () => <div className="w-full h-[600px] bg-muted rounded-lg flex items-center justify-center">Loading roadmap...</div>,
-});
 
 interface RoadmapData {
   id: string;
@@ -141,64 +135,69 @@ export default function RoadmapViewPage() {
     fetchRoadmap();
   }, [slug]);
 
-  const handleNodeClick = (nodeId: string, nodeData: any) => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
-      return;
-    }
+  const handleNodeClick = useCallback(
+    (nodeId: string, nodeData: any) => {
+      if (status === 'unauthenticated') {
+        router.push('/auth/signin');
+        return;
+      }
 
-    const nodeState = userProgress?.nodeProgress?.find(
-      (p: any) => p.nodeId === nodeId
-    )?.state || 'locked';
+      const nodeState = userProgress?.nodeProgress?.find(
+        (p: any) => p.nodeId === nodeId
+      )?.state || 'locked';
 
-    setSelectedNode({
-      ...nodeData,
-      id: nodeId,
-      currentState: nodeState,
-    });
-    setDetailOpen(true);
-  };
-
-  const handleNodeStateChange = async (nodeId: string, newState: string) => {
-    if (!slug || !session?.user?.id) return;
-
-    setIsSaving(true);
-    try {
-      const response = await fetch(`/api/roadmap/${slug}/progress`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, newState }),
+      setSelectedNode({
+        ...nodeData,
+        id: nodeId,
+        currentState: nodeState,
       });
+      setDetailOpen(true);
+    },
+    [status, userProgress, router]
+  );
 
-      if (!response.ok) {
-        throw new Error('Failed to update progress');
-      }
+  const handleNodeStateChange = useCallback(
+    async (nodeId: string, newState: string) => {
+      if (!slug || !session?.user?.id) return;
 
-      const data = await response.json();
-      setUserProgress(data.userProgress);
-
-      // Update selected node state
-      if (selectedNode) {
-        setSelectedNode({
-          ...selectedNode,
-          currentState: newState,
+      setIsSaving(true);
+      try {
+        const response = await fetch(`/api/roadmap/${slug}/progress`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId, newState }),
         });
-      }
-    } catch (err) {
-      console.error('Error updating node state:', err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
-  const handleShareRoadmap = async () => {
+        if (!response.ok) {
+          throw new Error('Failed to update progress');
+        }
+
+        const data = await response.json();
+        setUserProgress(data.userProgress);
+
+        // Update selected node state
+        setSelectedNode((prev) =>
+          prev ? { ...prev, currentState: newState } : null
+        );
+      } catch (err) {
+        console.error('Error updating node state:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [slug, session?.user?.id]
+  );
+
+  const handleShareRoadmap = useCallback(async () => {
+    if (!roadmap) return;
+
     const shareUrl = `${window.location.origin}/roadmap/${slug}`;
-    
+
     if (navigator.share) {
       try {
         await navigator.share({
-          title: roadmap?.title,
-          text: `Check out this learning roadmap: ${roadmap?.title}`,
+          title: roadmap.title,
+          text: `Check out this learning roadmap: ${roadmap.title}`,
           url: shareUrl,
         });
       } catch (err) {
@@ -210,21 +209,21 @@ export default function RoadmapViewPage() {
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 2000);
     }
-  };
+  }, [roadmap, slug]);
 
-  const handleDuplicateRoadmap = () => {
+  const handleDuplicateRoadmap = useCallback(() => {
     if (!roadmap?.title) return;
-    
-    const slug = `${roadmap.title}-copy`
+
+    const newSlug = `${roadmap.title}-copy`
       .toLowerCase()
       .trim()
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '');
-    
-    router.push(`/roadmap/${slug}`);
-  };
 
-  const handleExportRoadmap = () => {
+    router.push(`/roadmap/${newSlug}`);
+  }, [roadmap?.title, router]);
+
+  const handleExportRoadmap = useCallback(() => {
     if (!roadmap) return;
 
     const exportData = {
@@ -242,7 +241,7 @@ export default function RoadmapViewPage() {
     link.download = `${slug}-roadmap.json`;
     link.click();
     URL.revokeObjectURL(url);
-  };
+  }, [roadmap, slug]);
 
   const progressPercent = userProgress?.progressPercent || 0;
 
@@ -371,19 +370,14 @@ export default function RoadmapViewPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isMounted && (
-              <RoadmapCanvas
-                roadmap={roadmap}
-                userProgress={userProgress}
-                onNodeClick={handleNodeClick}
-                onNodeStateChange={handleNodeStateChange}
-              />
-            )}
-            {!isMounted && (
-              <div className="w-full h-[600px] bg-muted rounded-lg flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            )}
+            <RoadmapViewer
+              roadmap={roadmap}
+              userProgress={userProgress}
+              onNodeClick={handleNodeClick}
+              onNodeStateChange={handleNodeStateChange}
+              isMounted={isMounted}
+              isLoading={isSaving}
+            />
           </CardContent>
         </Card>
 
