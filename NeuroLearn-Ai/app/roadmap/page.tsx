@@ -104,7 +104,7 @@ export default function RoadmapListPage() {
         <Navbar isAuthenticated={false} />
         <main className="container mx-auto px-4 py-16">
           <div className="text-center max-w-2xl mx-auto">
-            <h1 className="text-4xl font-bold tracking-tight mb-4">Learning Roadmaps</h1>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">Learning Roadmaps</h1>
             <p className="text-lg text-muted-foreground mb-8">
               Choose a learning path and track your progress through structured learning goals.
             </p>

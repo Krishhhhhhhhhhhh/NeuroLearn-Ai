@@ -85,14 +85,14 @@ export function RoadmapViewer({
 
   if (!isMounted) {
     return (
-      <div className="w-full h-[600px] bg-muted rounded-lg flex items-center justify-center">
+      <div className="w-full h-[700px] bg-muted rounded-lg flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border border-muted-foreground border-t-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="h-[600px] w-full rounded-lg border">
+    <div className="h-[700px] w-full rounded-lg border overflow-hidden bg-background">
       <RoadmapCanvas
         roadmap={memoizedRoadmap}
         userProgress={memoizedUserProgress}

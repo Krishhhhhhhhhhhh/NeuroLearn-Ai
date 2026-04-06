@@ -164,6 +164,8 @@ model RoadmapNode {
   description      String?
   resources        Json?
   
+  level            Int                     @default(1)
+  stepNumber       Int?
   position         Json
   dependsOn        String[]                @default([])
   
