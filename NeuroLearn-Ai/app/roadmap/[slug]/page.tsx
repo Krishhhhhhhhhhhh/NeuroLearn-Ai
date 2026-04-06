@@ -111,7 +111,12 @@ export default function RoadmapViewPage() {
                 );
               }
             } else {
-              throw new Error('Failed to save generated roadmap');
+              const errorData = await saveResponse.json().catch(() => ({}));
+              console.error('Save roadmap error:', {
+                status: saveResponse.status,
+                error: errorData,
+              });
+              throw new Error(`Failed to save generated roadmap: ${errorData.error || 'Unknown error'}`);
             }
           } catch (genErr: any) {
             console.error('Error generating roadmap with Gemini:', genErr);
@@ -366,7 +371,7 @@ export default function RoadmapViewPage() {
               Learning Path
             </CardTitle>
             <CardDescription>
-              Click nodes to view details. {status === 'unauthenticated' ? 'Sign in to track progress.' : 'Your progress is automatically saved.'}
+              Follow the numbered steps in order (↓ arrows show dependencies). Click any node to view resources and track your progress. {status === 'unauthenticated' ? 'Sign in to track progress.' : 'Your progress is automatically saved.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -381,32 +386,88 @@ export default function RoadmapViewPage() {
           </CardContent>
         </Card>
 
-        {/* Legend */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Legend</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-gray-200 dark:bg-gray-700 border border-gray-400" />
-                <span>Locked</span>
+        {/* Legend and Flow Guide */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Legend */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <span className="text-base">📊</span> Node Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded bg-gradient-to-br from-slate-50 to-gray-100 border-2 border-gray-400 dark:from-slate-800 dark:to-gray-700" />
+                  <div>
+                    <span className="font-medium">Locked</span>
+                    <p className="text-xs text-muted-foreground">Complete prerequisites first</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-500 dark:from-amber-900 dark:to-orange-900" />
+                  <div>
+                    <span className="font-medium">Unlocked</span>
+                    <p className="text-xs text-muted-foreground">Ready to start learning</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-500 dark:from-blue-900 dark:to-cyan-900" />
+                  <div>
+                    <span className="font-medium">In Progress</span>
+                    <p className="text-xs text-muted-foreground">Currently learning this topic</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-500 dark:from-green-900 dark:to-emerald-900" />
+                  <div>
+                    <span className="font-medium">Completed</span>
+                    <p className="text-xs text-muted-foreground">✓ Mastered this topic</p>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-amber-100 dark:bg-amber-900 border border-amber-500" />
-                <span>Unlocked</span>
+            </CardContent>
+          </Card>
+
+          {/* Learning Flow Guide */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <span className="text-base">🎓</span> Learning Flow
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-full h-6 w-6 flex items-center justify-center font-bold text-xs">
+                      1
+                    </div>
+                    <span className="font-medium">Step Numbers</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-8">Numbered badges show the order of learning. Start with Step 1.</p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-cyan-500 font-bold text-lg">→</span>
+                    <span className="font-medium">Dependencies</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-8">Arrows show which topics must be completed before starting a new one.</p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-2 h-2 rounded-full bg-cyan-500" />
+                    <span className="font-medium">Progress Lines</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-8">Animated lines connect sequential learning steps for clarity.</p>
+                </div>
+                <div className="pt-2 mt-2 border-t">
+                  <p className="text-xs text-muted-foreground font-medium">💡 Tip: Follow the numbered steps in order for optimal learning!</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-blue-100 dark:bg-blue-900 border border-blue-500" />
-                <span>In Progress</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-green-100 dark:bg-green-900 border border-green-500" />
-                <span>Completed</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </main>
 
       {/* Node Detail Modal */}

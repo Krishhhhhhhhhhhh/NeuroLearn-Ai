@@ -27,6 +27,7 @@ interface RoadmapCanvasProps {
       position: { x: number; y: number };
       dependsOn?: string[];
       resources?: any;
+      stepNumber?: number;
     }>;
   };
   userProgress?: {
@@ -71,27 +72,86 @@ export default function RoadmapCanvas({
   const initialNodes = useMemo(() => {
     if (!roadmap?.nodes) return [];
 
-    return roadmap.nodes.map((node) => {
-      const nodeProgressData = userProgress?.nodeProgress?.find(
-        (p) => p.nodeId === node.id
-      );
-      const state = nodeProgressData?.state || 'locked';
+    // If stepNumber is provided in node data, use it; otherwise calculate based on dependency levels
+    const hasStepNumbers = roadmap.nodes.some((node) => node.stepNumber !== undefined);
 
-      return {
-        id: node.id,
-        data: {
-          label: node.title,
-          description: node.description,
-          state,
-          onClick: () => handleNodeClick(node.id, node),
-          onStateChange: (newState: string) => {
-            handleStateChange(node.id, newState);
+    if (hasStepNumbers) {
+      // Use pre-calculated step numbers from the API
+      return roadmap.nodes.map((node) => {
+        const nodeProgressData = userProgress?.nodeProgress?.find(
+          (p) => p.nodeId === node.id
+        );
+        const state = nodeProgressData?.state || 'locked';
+
+        return {
+          id: node.id,
+          data: {
+            label: node.title,
+            description: node.description,
+            state,
+            stepNumber: node.stepNumber,
+            onClick: () => handleNodeClick(node.id, node),
+            onStateChange: (newState: string) => {
+              handleStateChange(node.id, newState);
+            },
           },
-        },
-        position: node.position || { x: 0, y: 0 },
-        type: 'roadmapNode',
+          position: node.position || { x: 0, y: 0 },
+          type: 'roadmapNode',
+        };
+      });
+    } else {
+      // Fallback: Calculate step numbers based on dependency levels
+      const nodeLevels = new Map<string, number>();
+      const calculateLevel = (nodeId: string): number => {
+        if (nodeLevels.has(nodeId)) {
+          return nodeLevels.get(nodeId)!;
+        }
+
+        const node = roadmap.nodes.find((n) => n.id === nodeId);
+        if (!node || !node.dependsOn || node.dependsOn.length === 0) {
+          nodeLevels.set(nodeId, 0);
+          return 0;
+        }
+
+        let maxDepLevel = 0;
+        for (const depId of node.dependsOn) {
+          const depLevel = calculateLevel(depId);
+          maxDepLevel = Math.max(maxDepLevel, depLevel);
+        }
+
+        const level = maxDepLevel + 1;
+        nodeLevels.set(nodeId, level);
+        return level;
       };
-    });
+
+      roadmap.nodes.forEach((node) => {
+        calculateLevel(node.id);
+      });
+
+      return roadmap.nodes.map((node) => {
+        const nodeProgressData = userProgress?.nodeProgress?.find(
+          (p) => p.nodeId === node.id
+        );
+        const state = nodeProgressData?.state || 'locked';
+        const stepNumber = (nodeLevels.get(node.id) || 0) + 1;
+
+        return {
+          id: node.id,
+          data: {
+            label: node.title,
+            description: node.description,
+            state,
+            stepNumber,
+            onClick: () => handleNodeClick(node.id, node),
+            onStateChange: (newState: string) => {
+              handleStateChange(node.id, newState);
+            },
+          },
+          position: node.position || { x: 0, y: 0 },
+          type: 'roadmapNode',
+        };
+      });
+    }
   }, [roadmap?.nodes, userProgress?.nodeProgress, handleNodeClick, handleStateChange]);
 
   // Memoize edges calculation
@@ -130,7 +190,7 @@ export default function RoadmapCanvas({
   );
 
   return (
-    <div style={{ width: '100%', height: '600px' }} className="rounded-lg border">
+    <div style={{ width: '100%', height: '100%' }} className="rounded-lg border overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -139,8 +199,9 @@ export default function RoadmapCanvas({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
+        attributionPosition="bottom-left"
       >
-        <Background />
+        <Background gap={12} size={1} />
         <Controls />
       </ReactFlow>
     </div>
