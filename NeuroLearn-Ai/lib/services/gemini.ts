@@ -1,68 +1,74 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from "@google/genai";
 
 export class GeminiService {
-  private genAI: GoogleGenerativeAI;
+  private ai: GoogleGenAI;
 
   constructor() {
     if (!process.env.GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY environment variable is not set. Make sure .env.local exists in the project root.');
+      throw new Error(
+        "GEMINI_API_KEY environment variable is not set. Make sure .env.local exists in the project root.",
+      );
     }
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
 
-  async generateVideoSummary(title: string, description: string): Promise<string> {
+  async generateVideoSummary(
+    title: string,
+    description: string,
+  ): Promise<string> {
     try {
-      // Use a safe fallback model name (update as needed per Google API docs)
-      const modelName = 'models/gemini-2.0-flash';
-      const model = this.genAI.getGenerativeModel({ model: modelName });
+      const modelName = "gemini-2.0-flash";
 
       const prompt = `
         Create a concise, educational summary of this video based on its title and description:
-        
+
         Title: ${title}
         Description: ${description}
-        
+
         Provide a clear, structured summary that:
         1. Explains what the viewer will learn
         2. Highlights key concepts covered
         3. Mentions the target audience level
         4. Keeps it under 150 words
-        
+
         Format as plain text with bullet points where appropriate.
       `;
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      console.log('[Gemini DEBUG] Raw summary response:', text);
+      const result = await this.ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+      });
+
+      const text = result.text ?? "";
+      console.log("[Gemini DEBUG] Raw summary response:", text);
       return text;
     } catch (error: any) {
       if (error && error.status === 404) {
-        console.error('[Gemini ERROR] Model not found. Please check the model name and your API access.');
+        console.error(
+          "[Gemini ERROR] Model not found. Please check the model name and your API access.",
+        );
       }
-      console.error('Gemini API Error:', error);
-      return 'Summary unavailable. Please watch the video for full content.';
+      console.error("Gemini API Error:", error);
+      return "Summary unavailable. Please watch the video for full content.";
     }
   }
 
   async generateQuiz(title: string, description: string): Promise<any[]> {
     try {
-      // Use a safe fallback model name (update as needed per Google API docs)
-      const modelName = 'models/gemini-2.0-flash';
-      const model = this.genAI.getGenerativeModel({ model: modelName });
+      const modelName = "gemini-2.0-flash";
 
       const prompt = `
         Based on this educational video, create 3 multiple-choice questions:
-        
+
         Title: ${title}
         Description: ${description}
-        
+
         Generate questions that:
         1. Test understanding of key concepts
         2. Are appropriate for the content level
         3. Have 4 answer options each
         4. Include explanations for correct answers
-        
+
         Return as JSON array with this structure:
         [
           {
@@ -72,44 +78,50 @@ export class GeminiService {
             "explanation": "Why this is correct"
           }
         ]
-        
+
         Return only valid JSON, no additional text.
       `;
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      console.log('[Gemini DEBUG] Raw quiz response:', text);
+      const result = await this.ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+      });
 
-      // Extract the first JSON array from the response (works for single-line or compact JSON)
-      let match = text.match(/\[[\s\S]*\]/);
+      const text = result.text ?? "";
+      console.log("[Gemini DEBUG] Raw quiz response:", text);
+
+      // Extract the first JSON array from the response
+      const match = text.match(/\[[\s\S]*\]/);
       if (match) {
         try {
           return JSON.parse(match[0]);
         } catch (e) {
-          console.error('[Gemini DEBUG] JSON parse error:', e);
+          console.error("[Gemini DEBUG] JSON parse error:", e);
         }
       }
+
       // Fallback if JSON parsing fails
       return [
         {
           question: "What is the main topic of this video?",
           options: ["Concept A", "Concept B", "Concept C", "All of the above"],
           correctAnswer: 3,
-          explanation: "This video covers multiple related concepts."
-        }
+          explanation: "This video covers multiple related concepts.",
+        },
       ];
     } catch (error: any) {
       if (error && error.status === 404) {
-        console.error('[Gemini ERROR] Model not found. Please check the model name and your API access.');
+        console.error(
+          "[Gemini ERROR] Model not found. Please check the model name and your API access.",
+        );
       }
-      console.error('Gemini Quiz Generation Error:', error);
+      console.error("Gemini Quiz Generation Error:", error);
       return [];
     }
   }
+
   async enhanceJobKeywords(jobTitle: string, jobDescription: string) {
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const prompt = `
       You are an AI career and learning assistant. Your task is to analyze a job description and provide a structured learning plan.
 
@@ -125,10 +137,14 @@ export class GeminiService {
       ${jobDescription}
     `;
 
-      const result = await model.generateContent(prompt);
-      let jsonString = result.response.text().trim();
+      const result = await this.ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: prompt,
+      });
 
-      // 🧹 Clean response (remove markdown code fences if Gemini adds them)
+      let jsonString = (result.text ?? "").trim();
+
+      // Clean response (remove markdown code fences if Gemini adds them)
       jsonString = jsonString.replace(/```json|```/g, "").trim();
 
       console.log("[Gemini DEBUG] Cleaned JSON:", jsonString);
@@ -145,61 +161,91 @@ export class GeminiService {
     }
   }
 
-  async categorizeDifficulty(title: string, description: string): Promise<string> {
+  async categorizeDifficulty(
+    title: string,
+    description: string,
+  ): Promise<string> {
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
       const prompt = `
         Categorize the difficulty level of this educational content:
-        
+
         Title: ${title}
         Description: ${description}
-        
+
         Return only one word: "beginner", "intermediate", or "advanced"
-        
+
         Guidelines:
         - beginner: Basic concepts, no prerequisites, introductory
         - intermediate: Some background knowledge needed, building on basics
         - advanced: Complex topics, assumes prior knowledge, specialized
       `;
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const difficulty = response.text().toLowerCase().trim();
+      const result = await this.ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: prompt,
+      });
 
-      if (['beginner', 'intermediate', 'advanced'].includes(difficulty)) {
+      const difficulty = (result.text ?? "").toLowerCase().trim();
+
+      if (["beginner", "intermediate", "advanced"].includes(difficulty)) {
         return difficulty;
       }
-      return 'beginner'; // default fallback
+      return "beginner"; // default fallback
     } catch (error: any) {
-      console.warn('[Gemini] Error categorizing difficulty (using fallback):', error?.message);
+      console.warn(
+        "[Gemini] Error categorizing difficulty (using fallback):",
+        error?.message,
+      );
       // Use keyword-based fallback when Gemini API is unavailable or rate-limited
       return this.categorizeDifficultyFallback(title, description);
     }
   }
 
-  private categorizeDifficultyFallback(title: string, description: string): string {
+  private categorizeDifficultyFallback(
+    title: string,
+    description: string,
+  ): string {
     const text = `${title} ${description}`.toLowerCase();
-    
+
     // Advanced keywords
-    const advancedKeywords = ['advanced', 'expert', 'professional', 'complex', 'optimization', 'architecture', 'system design', 'deep dive', 'specialized', 'enterprise', 'performance tuning', 'advanced concepts'];
-    
-    // Intermediate keywords  
-    const intermediateKeywords = ['intermediate', 'building', 'development', 'implementation', 'project', 'application', 'best practices', 'design patterns', 'practical', 'hands-on', 'build'];
-    
-    // Check for advanced keywords
-    if (advancedKeywords.some(keyword => text.includes(keyword))) {
-      return 'advanced';
+    const advancedKeywords = [
+      "advanced",
+      "expert",
+      "professional",
+      "complex",
+      "optimization",
+      "architecture",
+      "system design",
+      "deep dive",
+      "specialized",
+      "enterprise",
+      "performance tuning",
+      "advanced concepts",
+    ];
+
+    // Intermediate keywords
+    const intermediateKeywords = [
+      "intermediate",
+      "building",
+      "development",
+      "implementation",
+      "project",
+      "application",
+      "best practices",
+      "design patterns",
+      "practical",
+      "hands-on",
+      "build",
+    ];
+
+    if (advancedKeywords.some((keyword) => text.includes(keyword))) {
+      return "advanced";
     }
-    
-    // Check for intermediate keywords
-    if (intermediateKeywords.some(keyword => text.includes(keyword))) {
-      return 'intermediate';
+
+    if (intermediateKeywords.some((keyword) => text.includes(keyword))) {
+      return "intermediate";
     }
-    
-    // Default to beginner
-    return 'beginner';
+
+    return "beginner";
   }
 }
-
-
