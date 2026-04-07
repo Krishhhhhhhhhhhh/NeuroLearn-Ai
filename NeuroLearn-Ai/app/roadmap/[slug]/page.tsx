@@ -1,16 +1,25 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { Navbar } from '@/components/navbar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Zap, Loader2, Share2, Copy, Download } from 'lucide-react';
-import { RoadmapViewer } from '@/components/roadmap/RoadmapViewer';
-import { RoadmapNodeDetail } from '@/components/roadmap/RoadmapNodeDetail';
-import { generateRoadmapWithGemini } from '@/lib/services/roadmapGenerator';
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { Navbar } from "@/components/navbar";
+import { Button } from "@/components/ui/button";
+import {
+  AlertCircle,
+  Share2,
+  Copy,
+  Download,
+  Loader2,
+  Trophy,
+  Zap,
+} from "lucide-react";
+import { RoadmapViewer } from "@/components/roadmap/RoadmapViewer";
+import { RoadmapNodeDetail } from "@/components/roadmap/RoadmapNodeDetail";
+import { generateRoadmapWithGemini } from "@/lib/services/roadmapGenerator";
+import { cn } from "@/lib/utils";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RoadmapData {
   id: string;
@@ -24,8 +33,176 @@ interface RoadmapData {
     position: { x: number; y: number };
     dependsOn?: string[];
     resources?: any;
+    stepNumber?: number;
+    level?: number;
   }>;
 }
+
+// ─── Progress Header ──────────────────────────────────────────────────────────
+
+function ProgressHeader({
+  completed,
+  total,
+  percent,
+}: {
+  completed: number;
+  total: number;
+  percent: number;
+}) {
+  const isFinished = percent === 100;
+
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border-2 p-5 mb-8 transition-all duration-500",
+        isFinished
+          ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-800/60 dark:bg-emerald-950/20"
+          : "border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-950",
+      )}
+    >
+      {/* Top row */}
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <p
+            className={cn(
+              "text-sm font-semibold",
+              isFinished
+                ? "text-emerald-700 dark:text-emerald-400"
+                : "text-slate-700 dark:text-slate-300",
+            )}
+          >
+            {isFinished ? "🎉 Roadmap complete!" : "Your Progress"}
+          </p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+            {completed} of {total} skill{total !== 1 ? "s" : ""} completed
+            {total - completed > 0 && ` · ${total - completed} remaining`}
+          </p>
+        </div>
+
+        {/* Percentage */}
+        <span
+          className={cn(
+            "text-3xl font-bold tabular-nums leading-none",
+            isFinished
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-slate-900 dark:text-slate-100",
+          )}
+        >
+          {percent}%
+        </span>
+      </div>
+
+      {/* Bar */}
+      <div className="relative h-2.5 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
+          style={{
+            width: `${percent}%`,
+            background: isFinished
+              ? "linear-gradient(to right, #10b981, #14b8a6)"
+              : percent > 60
+                ? "linear-gradient(to right, #3b82f6, #8b5cf6)"
+                : "linear-gradient(to right, #6366f1, #8b5cf6)",
+          }}
+        />
+      </div>
+
+      {/* Milestones */}
+      <div className="flex justify-between mt-1.5">
+        {[0, 25, 50, 75, 100].map((m) => (
+          <span
+            key={m}
+            className={cn(
+              "text-[10px] font-medium tabular-nums",
+              percent >= m
+                ? "text-slate-500 dark:text-slate-400"
+                : "text-slate-300 dark:text-slate-700",
+            )}
+          >
+            {m === 0 ? "Start" : m === 100 ? "Done" : `${m}%`}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Loading screen ───────────────────────────────────────────────────────────
+
+function LoadingScreen({ generating }: { generating: boolean }) {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      <Navbar isAuthenticated={false} />
+      <main className="container mx-auto px-4 py-16">
+        <div className="max-w-3xl mx-auto flex flex-col items-center justify-center gap-5 text-center">
+          {generating ? (
+            <>
+              {/* Animated brain icon */}
+              <div className="relative h-16 w-16">
+                <div className="absolute inset-0 rounded-2xl bg-primary/10 animate-pulse" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Zap className="h-8 w-8 text-primary animate-bounce" />
+                </div>
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                  Building your roadmap with AI…
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
+                  Designing a structured learning path just for you
+                </p>
+              </div>
+              {/* Progress dots */}
+              <div className="flex gap-1.5 mt-1">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="h-2 w-2 rounded-full bg-primary/40 animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ─── Error screen ─────────────────────────────────────────────────────────────
+
+function ErrorScreen({ error, onBack }: { error: string; onBack: () => void }) {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      <Navbar isAuthenticated={false} />
+      <main className="container mx-auto px-4 py-16">
+        <div className="max-w-3xl mx-auto">
+          <div className="rounded-2xl border-2 border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/20 p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-800 dark:text-red-300 mb-1">
+                  Could not load roadmap
+                </p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {error}
+                </p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={onBack}>
+              ← Back to Roadmaps
+            </Button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function RoadmapViewPage() {
   const router = useRouter();
@@ -42,14 +219,8 @@ export default function RoadmapViewPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
 
-  // Ensure component is mounted before rendering React Flow (prevents hydration mismatch)
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Fetch roadmap data with Gemini fallback
+  // ── Fetch roadmap ──────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchRoadmap = async () => {
       try {
@@ -66,72 +237,64 @@ export default function RoadmapViewPage() {
           return;
         }
 
-        // Fetch from database
         const response = await fetch(`/api/roadmap/${slug}`);
 
         if (response.ok) {
-          // Roadmap found in database
           const data = await response.json();
           setRoadmap(data.roadmap);
           setUserProgress(data.userProgress);
-          
-          // Cache in sessionStorage
           sessionStorage.setItem(`roadmap_${slug}`, JSON.stringify(data));
         } else if (response.status === 404) {
-          // Roadmap not found - generate with Gemini AI
           setGeneratingWithAI(true);
-          
           try {
             const generatedRoadmap = await generateRoadmapWithGemini(slug);
-            
-            // Auto-save to database
-            const saveResponse = await fetch('/api/roadmap', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+
+            const saveResponse = await fetch("/api/roadmap", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(generatedRoadmap),
             });
 
             if (saveResponse.ok) {
               const savedData = await saveResponse.json();
               setRoadmap(savedData.roadmap);
-              
-              // Fetch user progress for newly saved roadmap
+
               const progressResponse = await fetch(`/api/roadmap/${slug}`);
               if (progressResponse.ok) {
                 const progressData = await progressResponse.json();
                 setUserProgress(progressData.userProgress);
-                
-                // Cache both in sessionStorage
                 sessionStorage.setItem(
                   `roadmap_${slug}`,
                   JSON.stringify({
                     roadmap: progressData.roadmap,
                     userProgress: progressData.userProgress,
-                  })
+                  }),
                 );
               }
             } else {
               const errorData = await saveResponse.json().catch(() => ({}));
-              console.error('Save roadmap error:', {
-                status: saveResponse.status,
-                error: errorData,
-              });
-              throw new Error(`Failed to save generated roadmap: ${errorData.error || 'Unknown error'}`);
+              throw new Error(
+                `Failed to save generated roadmap: ${errorData.error || "Unknown error"}`,
+              );
             }
           } catch (genErr: any) {
-            console.error('Error generating roadmap with Gemini:', genErr);
             setError(
-              `Could not find "${slug}" and AI generation failed: ${genErr.message}. Try a different topic.`
+              `Could not find "${slug}" and AI generation failed: ${genErr.message}. Try a different topic.`,
             );
           } finally {
             setGeneratingWithAI(false);
           }
         } else {
-          throw new Error(`Failed to fetch roadmap (Status: ${response.status})`);
+          throw new Error(
+            `Failed to fetch roadmap (Status: ${response.status})`,
+          );
         }
       } catch (err) {
-        console.error('Error fetching roadmap:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load roadmap. Please try again.');
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load roadmap. Please try again.",
+        );
       } finally {
         setLoading(false);
       }
@@ -140,62 +303,59 @@ export default function RoadmapViewPage() {
     fetchRoadmap();
   }, [slug]);
 
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
   const handleNodeClick = useCallback(
     (nodeId: string, nodeData: any) => {
-      if (status === 'unauthenticated') {
-        router.push('/auth/signin');
+      if (status === "unauthenticated") {
+        router.push("/auth/signin");
         return;
       }
 
-      const nodeState = userProgress?.nodeProgress?.find(
-        (p: any) => p.nodeId === nodeId
-      )?.state || 'locked';
+      const nodeState =
+        userProgress?.nodeProgress?.find((p: any) => p.nodeId === nodeId)
+          ?.state ?? "locked";
 
-      setSelectedNode({
-        ...nodeData,
-        id: nodeId,
-        currentState: nodeState,
-      });
+      setSelectedNode({ ...nodeData, id: nodeId, currentState: nodeState });
       setDetailOpen(true);
     },
-    [status, userProgress, router]
+    [status, userProgress, router],
   );
 
   const handleNodeStateChange = useCallback(
     async (nodeId: string, newState: string) => {
-      if (!slug || !session?.user?.id) return;
+      if (!slug || !(session?.user as any)?.id) return;
 
       setIsSaving(true);
       try {
         const response = await fetch(`/api/roadmap/${slug}/progress`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ nodeId, newState }),
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to update progress');
-        }
+        if (!response.ok) throw new Error("Failed to update progress");
 
         const data = await response.json();
         setUserProgress(data.userProgress);
 
-        // Update selected node state
-        setSelectedNode((prev) =>
-          prev ? { ...prev, currentState: newState } : null
+        // Invalidate cache so fresh progress is fetched next visit
+        sessionStorage.removeItem(`roadmap_${slug}`);
+
+        setSelectedNode((prev: any) =>
+          prev ? { ...prev, currentState: newState } : null,
         );
       } catch (err) {
-        console.error('Error updating node state:', err);
+        console.error("Error updating node state:", err);
       } finally {
         setIsSaving(false);
       }
     },
-    [slug, session?.user?.id]
+    [slug, (session?.user as any)?.id],
   );
 
   const handleShareRoadmap = useCallback(async () => {
     if (!roadmap) return;
-
     const shareUrl = `${window.location.origin}/roadmap/${slug}`;
 
     if (navigator.share) {
@@ -205,11 +365,10 @@ export default function RoadmapViewPage() {
           text: `Check out this learning roadmap: ${roadmap.title}`,
           url: shareUrl,
         });
-      } catch (err) {
-        console.error('Error sharing:', err);
+      } catch {
+        /* user cancelled */
       }
     } else {
-      // Fallback: copy to clipboard
       navigator.clipboard.writeText(shareUrl);
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 2000);
@@ -218,259 +377,165 @@ export default function RoadmapViewPage() {
 
   const handleDuplicateRoadmap = useCallback(() => {
     if (!roadmap?.title) return;
-
     const newSlug = `${roadmap.title}-copy`
       .toLowerCase()
       .trim()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '');
-
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
     router.push(`/roadmap/${newSlug}`);
   }, [roadmap?.title, router]);
 
   const handleExportRoadmap = useCallback(() => {
     if (!roadmap) return;
-
     const exportData = {
       title: roadmap.title,
       description: roadmap.description,
       nodes: roadmap.nodes,
       generatedAt: new Date().toISOString(),
     };
-
     const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = `${slug}-roadmap.json`;
     link.click();
     URL.revokeObjectURL(url);
   }, [roadmap, slug]);
 
-  const progressPercent = userProgress?.progressPercent || 0;
+  // ── Derived values ─────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-        <Navbar isAuthenticated={status === 'authenticated'} />
-        <main className="container mx-auto px-4 py-8">
-          <div className="text-center space-y-4">
-            {generatingWithAI && (
-              <>
-                <div className="flex justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-                <p className="text-lg font-medium text-foreground">Creating your roadmap with AI...</p>
-                <p className="text-sm text-muted-foreground">This may take a moment</p>
-              </>
-            )}
-            {!generatingWithAI && <p className="text-muted-foreground">Loading roadmap...</p>}
-          </div>
-        </main>
-      </div>
-    );
+  const totalNodes = roadmap?.nodes?.length ?? 0;
+  const completedNodes =
+    userProgress?.nodeProgress?.filter((p: any) => p.state === "completed")
+      .length ?? 0;
+  const progressPercent =
+    totalNodes === 0 ? 0 : Math.round((completedNodes / totalNodes) * 100);
+
+  // ── Guards ─────────────────────────────────────────────────────────────────
+
+  if (loading || generatingWithAI) {
+    return <LoadingScreen generating={generatingWithAI} />;
   }
 
   if (error || !roadmap) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-        <Navbar isAuthenticated={status === 'authenticated'} />
-        <main className="container mx-auto px-4 py-8">
-          <Card className="border-destructive/50 bg-destructive/10">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-destructive mb-2">
-                <AlertCircle className="h-5 w-5" />
-                <p className="font-semibold">Error</p>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">{error}</p>
-              <Button onClick={() => router.push('/roadmap')}>Back to Roadmaps</Button>
-            </CardContent>
-          </Card>
-        </main>
-      </div>
+      <ErrorScreen
+        error={error ?? "Roadmap not found."}
+        onBack={() => router.push("/roadmap")}
+      />
     );
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-      <Navbar isAuthenticated={status === 'authenticated'} showBackButton />
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/10">
+      <Navbar isAuthenticated={status === "authenticated"} showBackButton />
 
       <main className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
+        <div className="max-w-3xl mx-auto">
+          {/* ── Back link ── */}
           <button
-            onClick={() => router.push('/roadmap')}
-            className="text-sm text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1"
+            onClick={() => router.push("/roadmap")}
+            className="inline-flex items-center gap-1 text-sm text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors mb-6"
           >
             ← Back to Roadmaps
           </button>
-          
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold tracking-tight mb-2">{roadmap.title}</h1>
-              {roadmap.description && (
-                <p className="text-muted-foreground max-w-2xl">{roadmap.description}</p>
-              )}
+
+          {/* ── Page header ── */}
+          <div className="mb-8">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 leading-tight">
+                  {roadmap.title}
+                </h1>
+                {roadmap.description && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-xl leading-relaxed">
+                    {roadmap.description}
+                  </p>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleShareRoadmap}
+                  className="gap-1.5 text-xs"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">
+                    {copyFeedback ? "Copied!" : "Share"}
+                  </span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDuplicateRoadmap}
+                  className="gap-1.5 text-xs hidden sm:flex"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Duplicate
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportRoadmap}
+                  className="gap-1.5 text-xs hidden sm:flex"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export
+                </Button>
+              </div>
             </div>
-            
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-2 items-start">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleShareRoadmap}
-                className="gap-2"
-              >
-                <Share2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Share</span>
-                {copyFeedback && <span className="text-xs">Copied!</span>}
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleDuplicateRoadmap}
-                className="gap-2"
-              >
-                <Copy className="h-4 w-4" />
-                <span className="hidden sm:inline">Duplicate</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleExportRoadmap}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">Export</span>
-              </Button>
+
+            {/* Stats strip */}
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <Trophy className="h-3.5 w-3.5" />
+                {totalNodes} skills
+              </span>
+              {status === "authenticated" && (
+                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500 font-medium">
+                  {completedNodes} completed
+                </span>
+              )}
+              {status === "unauthenticated" && (
+                <button
+                  onClick={() => router.push("/auth/signin")}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Sign in to track progress →
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Progress Bar */}
-          {status === 'authenticated' && (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="font-medium">Your Progress</span>
-                    <span className="text-muted-foreground">{progressPercent}%</span>
-                  </div>
-                  <Progress value={progressPercent} className="h-3" />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Roadmap Canvas */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
-              Learning Path
-            </CardTitle>
-            <CardDescription>
-              Follow the numbered steps in order (↓ arrows show dependencies). Click any node to view resources and track your progress. {status === 'unauthenticated' ? 'Sign in to track progress.' : 'Your progress is automatically saved.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RoadmapViewer
-              roadmap={roadmap}
-              userProgress={userProgress}
-              onNodeClick={handleNodeClick}
-              onNodeStateChange={handleNodeStateChange}
-              isMounted={isMounted}
-              isLoading={isSaving}
+          {/* ── Progress header (auth-gated) ── */}
+          {status === "authenticated" && (
+            <ProgressHeader
+              completed={completedNodes}
+              total={totalNodes}
+              percent={progressPercent}
             />
-          </CardContent>
-        </Card>
+          )}
 
-        {/* Legend and Flow Guide */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Legend */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <span className="text-base">📊</span> Node Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded bg-gradient-to-br from-slate-50 to-gray-100 border-2 border-gray-400 dark:from-slate-800 dark:to-gray-700" />
-                  <div>
-                    <span className="font-medium">Locked</span>
-                    <p className="text-xs text-muted-foreground">Complete prerequisites first</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-500 dark:from-amber-900 dark:to-orange-900" />
-                  <div>
-                    <span className="font-medium">Unlocked</span>
-                    <p className="text-xs text-muted-foreground">Ready to start learning</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-500 dark:from-blue-900 dark:to-cyan-900" />
-                  <div>
-                    <span className="font-medium">In Progress</span>
-                    <p className="text-xs text-muted-foreground">Currently learning this topic</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-500 dark:from-green-900 dark:to-emerald-900" />
-                  <div>
-                    <span className="font-medium">Completed</span>
-                    <p className="text-xs text-muted-foreground">✓ Mastered this topic</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Learning Flow Guide */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <span className="text-base">🎓</span> Learning Flow
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-full h-6 w-6 flex items-center justify-center font-bold text-xs">
-                      1
-                    </div>
-                    <span className="font-medium">Step Numbers</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground ml-8">Numbered badges show the order of learning. Start with Step 1.</p>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-cyan-500 font-bold text-lg">→</span>
-                    <span className="font-medium">Dependencies</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground ml-8">Arrows show which topics must be completed before starting a new one.</p>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-2 h-2 rounded-full bg-cyan-500" />
-                    <span className="font-medium">Progress Lines</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground ml-8">Animated lines connect sequential learning steps for clarity.</p>
-                </div>
-                <div className="pt-2 mt-2 border-t">
-                  <p className="text-xs text-muted-foreground font-medium">💡 Tip: Follow the numbered steps in order for optimal learning!</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* ── Flowchart ── */}
+          <RoadmapViewer
+            roadmap={roadmap}
+            userProgress={userProgress}
+            onNodeClick={handleNodeClick}
+            onNodeStateChange={handleNodeStateChange}
+            isLoading={isSaving}
+          />
         </div>
       </main>
 
-      {/* Node Detail Modal */}
+      {/* ── Node detail modal ── */}
       <RoadmapNodeDetail
         open={detailOpen}
         onOpenChange={setDetailOpen}
