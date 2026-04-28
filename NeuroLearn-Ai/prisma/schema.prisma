@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // Mock Interview Feature
@@ -167,7 +166,7 @@ model RoadmapNode {
   level            Int                     @default(1)
   stepNumber       Int?
   position         Json
-  dependsOn        String[]                @default([])
+  dependsOn        String[]                @default([]) @db.Array(String)
   
   userProgress     UserNodeProgress[]
   createdAt        DateTime                @default(now())

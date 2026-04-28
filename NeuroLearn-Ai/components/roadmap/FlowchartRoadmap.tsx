@@ -204,23 +204,9 @@ export function FlowchartRoadmap({
         return "locked";
       }
 
-      const deps = node.dependsOn ?? [];
-
-      // Root node — no prerequisites → always unlocked
-      if (deps.length === 0) {
-        result.set(nodeId, "unlocked");
-        return "unlocked";
-      }
-
-      // Temporarily mark locked to break any potential dependency cycles
-      result.set(nodeId, "locked");
-
-      // Unlock only when every prerequisite is completed
-      const allDepsCompleted = deps.every(
-        (depId) => compute(depId) === "completed",
-      );
-
-      const state: NodeState = allDepsCompleted ? "unlocked" : "locked";
+      // All nodes start as "unlocked" by default when roadmap is created
+      // Users can progress through any node without completing prerequisites
+      const state: NodeState = "unlocked";
       result.set(nodeId, state);
       return state;
     };
